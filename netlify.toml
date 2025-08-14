@@ -1,8 +1,13 @@
-# netlify.toml
-
 [build]
   command = "npm ci && npm run build"
   publish = "dist"
+
+# Transaction → Netlify Function
+[[redirects]]
+  from = "/api/transaction"
+  to = "/.netlify/functions/transaction"
+  status = 200
+  force = true
 
 # Proxy Netlify : /kazadi/* → Railway (même préfixe qu'en dev)
 [[redirects]]
@@ -16,4 +21,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-

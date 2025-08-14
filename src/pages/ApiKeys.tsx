@@ -31,7 +31,7 @@ interface ApiKey {
 /* =========================
    Réseau / Helpers
    ========================= */
-const ENV_BASE = ((import.meta as any)?.env?.VITE_API_BASE as string | undefined)?.trim();
+const ENV_BASE = ((import.meta as { env: { VITE_API_BASE?: string } })?.env?.VITE_API_BASE)?.trim();
 
 function buildApiBases(): string[] {
   const bases: string[] = [];
@@ -53,26 +53,30 @@ async function safeJson(res: Response) {
   const ct = res.headers.get('content-type') || '';
   const text = await res.text();
   if (!text) return {};
-  if (ct.includes('application/json')) { try { return JSON.parse(text); } catch {} }
+  if (ct.includes('application/json')) { try { return JSON.parse(text); } catch (error) {
+    console.error("Error parsing JSON:", error);
+  } }
   return { __nonJson: true, raw: text };
 }
 async function multiFetchKazadi(path: string, init?: RequestInit) {
-  let lastErr: any = null;
+  let lastErr: Error | null = null;
   for (const b of buildApiBases()) {
     const url = joinUrl(b, path);
     try {
       const res = await fetchWithTimeout(url, init);
       return { res, urlTried: url };
     } catch (e) {
-      lastErr = e;
+      lastErr = e as Error; // Cast to Error type
     }
   }
   throw new Error(`Impossible de joindre l'API (${lastErr?.message || 'NetworkError'})`);
 }
-function toISO(v: any): string {
+function toISO(v: unknown): string {
   if (!v) return new Date().toISOString();
-  if (v?.toDate) return v.toDate().toISOString();
-  if (typeof v?.seconds === 'number') return new Date(v.seconds * 1000).toISOString();
+  if (v && typeof v === 'object' && 'toDate' in v) return (v as { toDate: () => Date }).toDate().toISOString();
+  if (v && typeof v === 'object' && 'seconds' in v && typeof (v as { seconds: number }).seconds === 'number') {
+    return new Date((v as { seconds: number }).seconds * 1000).toISOString();
+  }
   const d = new Date(v); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 function isExpired(iso: string): boolean { return new Date(iso).getTime() <= Date.now(); }
@@ -134,7 +138,9 @@ function loadRevealFromSession(keyId: string): RevealData | null {
   } catch { return null; }
 }
 function saveRevealToSession(keyId: string, data: RevealData) {
-  try { sessionStorage.setItem(REVEAL_PREFIX + keyId, JSON.stringify(data)); } catch {}
+  try { sessionStorage.setItem(REVEAL_PREFIX + keyId, JSON.stringify(data)); } catch (error) {
+    console.error("Error saving reveal to session:", error);
+  }
 }
 
 /* Fallback copie si navigator.clipboard échoue */
@@ -144,7 +150,9 @@ async function copyText(text: string) {
       await navigator.clipboard.writeText(text);
       return;
     }
-  } catch {}
+  } catch (error) {
+    console.error("Error in fetchWithTimeout:", error);
+  }
   // fallback
   try {
     const ta = document.createElement('textarea');
@@ -155,7 +163,9 @@ async function copyText(text: string) {
     ta.focus(); ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-  } catch {}
+  } catch (error) {
+    console.error("Error in multiFetchKazadi:", error);
+  }
 }
 
 /* =========================
@@ -197,7 +207,9 @@ export default function ApiKeys() {
       const data = revealRef.current.get(keyId)!;
       if (Date.now() - data.createdAt > 20000) { // 20s
         revealRef.current.delete(keyId);
-        try { sessionStorage.removeItem(REVEAL_PREFIX + keyId); } catch {}
+        try { sessionStorage.removeItem(REVEAL_PREFIX + keyId); } catch (error) {
+          console.error("Error removing reveal from session:", error);
+        }
         return null;
       }
       return data;
@@ -223,8 +235,12 @@ export default function ApiKeys() {
       const q = query(qCol, orderBy('createdAt', 'desc'));
       off = onSnapshot(q, (snap) => {
         const rows: ApiKey[] = snap.docs.map((d) => {
-          const x: any = d.data();
-          const keyId = x.keyId || d.id;
+          const data: Record<string, unknown> = d.data();
+          const keyId = (data.keyId && typeof data.keyId === 'string') ? data.keyId : d.id;
+          if (typeof keyId !== 'string') {
+            console.error("Invalid keyId:", keyId);
+            return undefined; // or handle the error as needed
+          }
           docIdByKeyIdRef.current.set(keyId, d.id);
 
           // charge la révélation si disponible
@@ -236,26 +252,26 @@ export default function ApiKeys() {
             setVisibleSecretIds(prev => (prev.has(keyId) ? prev : new Set(prev).add(keyId)));
           }
 
-          const expiresAtISO = toISO(x.expiresAt) || new Date(Date.now() + 3600_000).toISOString();
-          const last4 = x.last4 || 'xxxx';
+          const expiresAtISO = data.expiresAt ? toISO(data.expiresAt) : new Date(Date.now() + 3600_000).toISOString();
+          const last4 = data.last4 || 'xxxx';
 
           return {
             id: keyId,
-            name: x.label || x.name || 'Clé',
+            name: data.label || data.name || 'Clé',
             key: reveal ? reveal.key : `kazadi-sk-************${last4}`,
             secret: reveal ? reveal.secret : '••••••••••••••••••••••••••••••••',
-            type: (x.type as 'test' | 'production') || 'test',
-            status: x.revokedAt ? 'revoked' : (isExpired(expiresAtISO) ? 'expired' : (x.status || 'active')),
-            createdAt: toISO(x.createdAt),
+            type: (data.type as 'test' | 'production') || 'test',
+            status: data.revokedAt ? 'revoked' : (isExpired(expiresAtISO) ? 'expired' : (data.status || 'active')),
+            createdAt: toISO(data.createdAt),
             expiresAt: expiresAtISO,
-            lastUsed: x.lastUsed ? toISO(x.lastUsed) : undefined,
-            requestCount: x.requestCount || 0,
+            lastUsed: data.lastUsed ? toISO(data.lastUsed) : undefined,
+            requestCount: data.requestCount || 0,
             last4
           };
-        });
+        }).filter((k): k is ApiKey => k !== undefined);
         setApiKeys(rows);
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       setErrorMsg(e?.message || 'Erreur Firestore');
     }
     return () => { if (off) off(); };
@@ -307,6 +323,7 @@ export default function ApiKeys() {
   const handleCreateKey = async () => {
     // 🔒 empêche tout double appel immédiat (double-clic, re-rendu)
     if (creatingRef.current) return;
+    console.log("Creating API key...");
     creatingRef.current = true;
 
     setErrorMsg(null);
@@ -324,9 +341,11 @@ export default function ApiKeys() {
       // 1) alias + token frais
       const aliasEmail = genAliasEmail();
       const password = await aliasPassword(user.id, aliasEmail);
-      try { await railwayRegister(aliasEmail, password); } catch {}
+      try { await railwayRegister(aliasEmail, password); } catch (error) {
+        console.error("Error during railway registration:", error);
+      }
       const lr = await railwayLogin(aliasEmail, password);
-      const lj: any = await safeJson(lr);
+      const lj: Record<string, unknown> = await safeJson(lr);
       if (!lr.ok || !lj?.token) throw new Error(lj?.error || lj?.raw || `Login Railway a échoué (HTTP ${lr.status})`);
       const token = String(lj.token).trim();
 
@@ -347,7 +366,7 @@ export default function ApiKeys() {
           email: aliasEmail
         })
       });
-      const j: any = await safeJson(res);
+      const j: Record<string, unknown> = await safeJson(res);
       if (!res.ok) throw new Error(j?.error || j?.raw || `HTTP ${res.status}`);
 
       const apiKeyPlain: string = j.apiKey || j.key || '';
@@ -392,19 +411,7 @@ export default function ApiKeys() {
       setVisibleKeyIds(prev => new Set(prev).add(keyId));
       setVisibleSecretIds(prev => new Set(prev).add(keyId));
 
-      // 6) MAJ UI immédiate (au cas où le snapshot arrive lentement)
-      setApiKeys(prev => [{
-        id: keyId,
-        name: newKeyData.name || 'Clé',
-        key: apiKeyPlain,
-        secret: newKeyData.clientSecret,
-        type: 'test',
-        status: 'active',
-        createdAt: createdAtISO,
-        expiresAt: expiresAtDate.toISOString(),
-        requestCount: 0,
-        last4
-      }, ...prev]);
+      
 
       setShowCreateModal(false);
       setNewKeyData({ name: '', type: 'test', clientSecret: '' });
@@ -415,7 +422,7 @@ export default function ApiKeys() {
         forceTick(x => x + 1);
       }, 20100); // juste après l'expiration
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       setErrorMsg(e?.message || 'Erreur réseau');
     } finally {
       setLoading(false);
@@ -440,11 +447,13 @@ export default function ApiKeys() {
         }),
       ]);
       revealRef.current.delete(k.id);
-      try { sessionStorage.removeItem(REVEAL_PREFIX + k.id); } catch {}
+      try { sessionStorage.removeItem(REVEAL_PREFIX + k.id); } catch (error) {
+        console.error("Error removing reveal from session:", error);
+      }
       setVisibleKeyIds(prev => { const s = new Set(prev); s.delete(k.id); return s; });
       setVisibleSecretIds(prev => { const s = new Set(prev); s.delete(k.id); return s; });
       setApiKeys(prev => prev.map(it => it.id === k.id ? { ...it, status: 'revoked' } : it));
-    } catch (e: any) {
+    } catch (e: unknown) {
       setErrorMsg(e?.message || 'Révocation impossible');
     }
   };
@@ -600,7 +609,11 @@ export default function ApiKeys() {
                       onClick={() => {
                         if (canReveal) return; // quand révélée, toujours visible
                         const s = new Set(visibleKeyIds);
-                        s.has(k.id) ? s.delete(k.id) : s.add(k.id);
+                        if (s.has(k.id)) {
+                          s.delete(k.id);
+                        } else {
+                          s.add(k.id);
+                        }
                         setVisibleKeyIds(s);
                       }}
                       className="p-1 text-blue-300 hover:text-blue-200 transition-colors"
@@ -636,7 +649,11 @@ export default function ApiKeys() {
                       onClick={() => {
                         if (canReveal) return; // quand révélée, toujours visible
                         const s = new Set(visibleSecretIds);
-                        s.has(k.id) ? s.delete(k.id) : s.add(k.id);
+                        if (s.has(k.id)) {
+                          s.delete(k.id);
+                        } else {
+                          s.add(k.id);
+                        }
                         setVisibleSecretIds(s);
                       }}
                       className="p-1 text-blue-300 hover:text-blue-200 transition-colors"
