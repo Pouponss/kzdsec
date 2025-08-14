@@ -4,10 +4,10 @@
   command = "npm ci && npm run build"
   publish = "dist"
 
-# Proxy Netlify : /api/* → Railway
+# Proxy Netlify : /kazadi/* → Railway (même préfixe qu'en dev)
 [[redirects]]
-  from = "/api/*"
-  to = "https://kazadi-securepay-api-production.up.railway.app/api/:splat"
+  from = "/kazadi/*"
+  to = "https://kazadi-securepay-api-production.up.railway.app/:splat"
   status = 200
   force = true
 
@@ -16,3 +16,4 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
