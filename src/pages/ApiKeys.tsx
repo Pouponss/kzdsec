@@ -36,8 +36,8 @@ const ENV_BASE = ((import.meta as any)?.env?.VITE_API_BASE as string | undefined
 function buildApiBases(): string[] {
   const bases: string[] = [];
   if (ENV_BASE) bases.push(ENV_BASE.replace(/\/+$/, ''));
-  bases.push('/kazadi'); // proxy Vite (dev)
-  bases.push('https://kazadi-securepay-api-production.up.railway.app'); // fallback prod
+  bases.push('/kazadi'); // proxy Vite (dev) / Netlify (prod) si configuré avec /kazadi/*
+  bases.push('https://kazadi-securepay-api-production.up.railway.app'); // fallback prod direct
   return Array.from(new Set(bases));
 }
 function joinUrl(base: string, path: string): string {
@@ -60,8 +60,12 @@ async function multiFetchKazadi(path: string, init?: RequestInit) {
   let lastErr: any = null;
   for (const b of buildApiBases()) {
     const url = joinUrl(b, path);
-    try { const res = await fetchWithTimeout(url, init); return { res, urlTried: url }; }
-    catch (e) { lastErr = e; }
+    try {
+      const res = await fetchWithTimeout(url, init);
+      return { res, urlTried: url };
+    } catch (e) {
+      lastErr = e;
+    }
   }
   throw new Error(`Impossible de joindre l'API (${lastErr?.message || 'NetworkError'})`);
 }
@@ -184,6 +188,9 @@ export default function ApiKeys() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 🔒 verrou anti-double appel
+  const creatingRef = useRef(false);
+
   // helper: récupère la révélation fiable (mémoire ou session)
   const getReveal = (keyId: string): RevealData | null => {
     if (revealRef.current.has(keyId)) {
@@ -298,14 +305,18 @@ export default function ApiKeys() {
 
   // ➕ Création
   const handleCreateKey = async () => {
+    // 🔒 empêche tout double appel immédiat (double-clic, re-rendu)
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+
     setErrorMsg(null);
 
-    if (!user?.id || !user?.email) { setErrorMsg('Veuillez vous connecter (email requis).'); return; }
-    if (newKeyData.type !== 'test') { setErrorMsg('Ici on ne crée que des clés TEST (validité 1h).'); return; }
+    if (!user?.id || !user?.email) { setErrorMsg('Veuillez vous connecter (email requis).'); creatingRef.current = false; return; }
+    if (newKeyData.type !== 'test') { setErrorMsg('Ici on ne crée que des clés TEST (validité 1h).'); creatingRef.current = false; return; }
     if (!newKeyData.clientSecret || newKeyData.clientSecret.trim().length < 6) {
-      setErrorMsg('Le Client Secret est obligatoire (min 6 caractères).'); return;
+      setErrorMsg('Le Client Secret est obligatoire (min 6 caractères).'); creatingRef.current = false; return;
     }
-    if (monthlyCreated >= 3) { setErrorMsg('Quota atteint : 3 clés de test / mois.'); return; }
+    if (monthlyCreated >= 3) { setErrorMsg('Quota atteint : 3 clés de test / mois.'); creatingRef.current = false; return; }
 
     try {
       setLoading(true);
@@ -319,13 +330,17 @@ export default function ApiKeys() {
       if (!lr.ok || !lj?.token) throw new Error(lj?.error || lj?.raw || `Login Railway a échoué (HTTP ${lr.status})`);
       const token = String(lj.token).trim();
 
-      // 2) générer la clé
+      // 2) générer la clé (avec idempotence)
+      const idem = (crypto.randomUUID?.() ?? (`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`));
+
       const { res } = await multiFetchKazadi('/api/generate-key', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'x-user-email': aliasEmail
+          'x-user-email': aliasEmail,
+          'x-idempotency-key': idem,
+          'x-request-id': idem
         },
         body: JSON.stringify({
           clientSecret: newKeyData.clientSecret,
@@ -404,6 +419,7 @@ export default function ApiKeys() {
       setErrorMsg(e?.message || 'Erreur réseau');
     } finally {
       setLoading(false);
+      creatingRef.current = false; // 🔓 libère le verrou
     }
   };
 
@@ -573,7 +589,6 @@ export default function ApiKeys() {
                           copyText(reveal!.key);
                         } else if (keyVisible) {
                           // visible mais masquée : on ne copie pas le masque
-                          // (on pourrait afficher un toast ici)
                         }
                       }}
                       className="p-1 text-blue-300 hover:text-blue-200 transition-colors"
@@ -730,8 +745,9 @@ export default function ApiKeys() {
             <div className="flex items-center space-x-3 mt-6">
               <button
                 onClick={handleCreateKey}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-teal-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-teal-700 transition-all hover:scale-105"
-                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-teal-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-teal-700 transition-all hover:scale-105 disabled:opacity-60"
+                disabled={loading || creatingRef.current}
+                aria-busy={loading || creatingRef.current}
               >
                 {loading ? 'Création…' : 'Créer la clé'}
               </button>
