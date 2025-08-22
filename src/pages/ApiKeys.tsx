@@ -87,7 +87,7 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 function toHex(u8: Uint8Array) { return Array.from(u8).map(b => b.toString(16).padStart(2, '0')).join(''); }
-const maskKazadiKey = (last4?: string) => `kazadi-sk-••••••••••••••••••••••••${last4 ?? ''}`;
+const maskKzdKey = (last4?: string) => `kzd-sk-••••••••••••••••••••••••${last4 ?? ''}`;
 
 /* ====== Génération email alias + mot de passe dérivé ====== */
 function rand6(): string {
@@ -100,7 +100,7 @@ function rand6(): string {
 }
 function genAliasEmail(): string { return `${rand6()}@falub.ca`; }
 async function aliasPassword(uid: string, aliasEmail: string): Promise<string> {
-  const data = new TextEncoder().encode(`kazadi:${uid}:${aliasEmail}:v2`);
+  const data = new TextEncoder().encode(`kzd:${uid}:${aliasEmail}:v2`);
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
   return `KS-${toHex(hash).slice(0, 32)}`;
 }
@@ -258,7 +258,7 @@ export default function ApiKeys() {
           return {
             id: keyId,
             name: data.label || data.name || 'Clé',
-            key: reveal ? reveal.key : `kazadi-sk-************${last4}`,
+            key: reveal ? reveal.key : `kzd-************${last4}`,
             secret: reveal ? reveal.secret : '••••••••••••••••••••••••••••••••',
             type: (data.type as 'test' | 'production') || 'test',
             status: data.revokedAt ? 'revoked' : (isExpired(expiresAtISO) ? 'expired' : (data.status || 'active')),
@@ -367,10 +367,11 @@ export default function ApiKeys() {
         })
       });
       const j: Record<string, unknown> = await safeJson(res);
+      console.log('Server response for generate-key:', j);
       if (!res.ok) throw new Error(j?.error || j?.raw || `HTTP ${res.status}`);
 
       const apiKeyPlain: string = j.apiKey || j.key || '';
-      if (!apiKeyPlain || !apiKeyPlain.startsWith('kazadi-sk-')) throw new Error('Format de clé inattendu.');
+      if (!apiKeyPlain || !apiKeyPlain.startsWith('kzd-')) throw new Error('Format de clé inattendu.');
       const keyId = j.keyId || randomId();
       const last4 = apiKeyPlain.slice(-4);
 
@@ -391,7 +392,7 @@ export default function ApiKeys() {
         ownerEmail: user.email,
         aliasEmail,
         requestCount: 0,
-        provider: 'kazadi-securepay',
+        provider: 'kzd-securepay',
         source: 'frontend',
         createdAt: serverTimestamp(),
         expiresAt: expiresAtTs,
@@ -476,7 +477,7 @@ export default function ApiKeys() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Clés API</h1>
-          <p className="text-blue-300">Gérez vos clés pour l’API Kazadi SecurePay</p>
+          <p className="text-blue-300">Gérez vos clés pour l’API KZD SecurePay</p>
           <p className="text-blue-300 text-sm mt-1">
             Test : validité <b>1h</b> • Limite <b>3 / mois</b> (par utilisateur)
           </p>
@@ -547,8 +548,8 @@ export default function ApiKeys() {
           const secretVisible = canReveal ? true : visibleSecretIds.has(k.id);  // idem
 
           const displayKey = keyVisible
-            ? (canReveal ? reveal!.key : maskKazadiKey(k.last4))
-            : maskKazadiKey(k.last4);
+            ? (canReveal ? reveal!.key : maskKzdKey(k.last4))
+            : maskKzdKey(k.last4);
 
           const displaySecret = secretVisible
             ? (canReveal ? reveal!.secret : '••••••••••••••••••••••••••••••••')

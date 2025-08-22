@@ -66,7 +66,7 @@ export default function Profile() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `kazadi-${type}-export.json`;
+          link.download = `kzd-${type}-export.json`;
     link.click();
     URL.revokeObjectURL(url);
   };

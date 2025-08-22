@@ -56,7 +56,7 @@ export default function Documentation() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Documentation</h1>
         <p className="text-blue-300">
-          Guide complet pour intégrer l'API Kazadi SecurePay dans vos applications
+          Guide complet pour intégrer l'API KZD SecurePay dans vos applications
         </p>
       </div>
 
@@ -123,7 +123,7 @@ export default function Documentation() {
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-4">Démarrage rapide</h2>
                   <p className="text-blue-300 mb-6">
-                    Intégrez l'API Kazadi SecurePay en quelques minutes. Suivez ces étapes pour effectuer votre première transaction.
+                    Intégrez l'API KZD SecurePay en quelques minutes. Suivez ces étapes pour effectuer votre première transaction.
                   </p>
                 </div>
 
@@ -261,7 +261,7 @@ Content-Type: application/json`}
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-4">Endpoints API</h2>
                   <p className="text-blue-300 mb-6">
-                    Liste complète des endpoints disponibles dans l'API Kazadi SecurePay.
+                    Liste complète des endpoints disponibles dans l'API KZD SecurePay.
                   </p>
                 </div>
 
@@ -346,7 +346,7 @@ Content-Type: application/json`}
                       language="JavaScript"
                       code={`const axios = require('axios');
 
-class KazadiSecurePay {
+class KZDSecurePay {
   constructor(apiKey, clientSecret) {
     this.apiKey = apiKey;
     this.clientSecret = clientSecret;
@@ -384,7 +384,7 @@ class KazadiSecurePay {
 }
 
 // Usage
-const payment = new KazadiSecurePay('your-api-key', 'your-secret');
+const payment = new KZDSecurePay('your-api-key', 'your-secret');
 const result = await payment.processTransaction({
   deviceId: 'device-123',
   cardNumber: '4242424242424242',
@@ -405,7 +405,7 @@ import time
 import random
 import string
 
-class KazadiSecurePay:
+class KZDSecurePay:
     def __init__(self, api_key, client_secret):
         self.api_key = api_key
         self.client_secret = client_secret
@@ -439,7 +439,7 @@ class KazadiSecurePay:
         return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
 # Usage
-payment = KazadiSecurePay('your-api-key', 'your-secret')
+payment = KZDSecurePay('your-api-key', 'your-secret')
 result = payment.process_transaction({
     'deviceId': 'device-123',
     'cardNumber': '4242424242424242',
@@ -467,7 +467,7 @@ result = payment.process_transaction({
                     <div className="flex items-center space-x-4">
                       <Download className="h-12 w-12" />
                       <div>
-                        <h3 className="text-xl font-semibold mb-2">Collection Kazadi SecurePay</h3>
+                        <h3 className="text-xl font-semibold mb-2">Collection KZD SecurePay</h3>
                         <p className="text-blue-100 mb-4">
                           Collection complète avec tous les endpoints et exemples
                         </p>

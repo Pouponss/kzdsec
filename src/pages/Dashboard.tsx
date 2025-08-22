@@ -263,7 +263,7 @@ export default function Dashboard() {
           Bonjour, {user?.name} 👋
         </h1>
         <p className="text-blue-300">
-          Bienvenue sur votre tableau de bord Kazadi SecurePay. Voici un aperçu de votre activité.
+          Bienvenue sur votre tableau de bord KZD SecurePay. Voici un aperçu de votre activité.
         </p>
       </div>
 

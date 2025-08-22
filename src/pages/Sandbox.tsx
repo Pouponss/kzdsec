@@ -289,7 +289,7 @@ export default function Sandbox() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">API Sandbox</h1>
         <p className="text-blue-300">
-          Testez l&apos;API Kazadi SecurePay en temps réel avec des données de test sécurisées
+          Testez l&apos;API KZD SecurePay en temps réel avec des données de test sécurisées
         </p>
       </div>
 
@@ -325,7 +325,7 @@ export default function Sandbox() {
                     value={formData.apiKey}
                     onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                     className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:outline-none focus:border-blue-400 pr-12"
-                    placeholder="kazadi-sk-********************************1234"
+                    placeholder="kzd-***********************************1234"
                   />
                   <button
                     type="button"
